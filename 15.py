@@ -47,12 +47,54 @@ def mostrar_base_de_datos():
     conexion.close()
 
 
+def cancion_mas_antigua():
+    conexion = sqlite3.connect('canciones.db')
+    cursor = conexion.cursor()
+    cursor.execute('SELECT * FROM canciones ORDER BY año ASC LIMIT 1')
+    fila = cursor.fetchone()
+    if fila:
+        print(
+            f"La canción más antigua es '{fila[0]}' de {fila[1]}, del año {fila[2]}.")
+    else:
+        print("No hay canciones registradas en la base de datos.")
+    conexion.close()
+
+
+def pais_con_mas_canciones():
+    conexion = sqlite3.connect('canciones.db')
+    cursor = conexion.cursor()
+    cursor.execute('''
+        SELECT pais, COUNT(*) as total
+        FROM (
+            SELECT SUBSTR(pais, 1, INSTR(pais, '/') - 1) as pais
+            FROM canciones
+            WHERE pais LIKE '%/%'
+            UNION ALL
+            SELECT pais
+            FROM canciones
+            WHERE pais NOT LIKE '%/%'
+        )
+        GROUP BY pais
+        ORDER BY total DESC
+        LIMIT 1
+    ''')
+    resultado = cursor.fetchone()
+    if resultado:
+        print(
+            f"El país con más canciones es {resultado[0]} con {resultado[1]} canciones.")
+    else:
+        print("No hay suficientes datos para determinar el país con más canciones.")
+    conexion.close()
+
+
 def principal():
     while True:
         print("\nMenú:")
         print("1. Obtener datos de la URL y almacenar en la base de datos")
         print("2. Mostrar base de datos")
-        print("3. Salir")
+        print("3. Consultar la canción más antigua")
+        print("4. Consultar el país con más canciones")
+        print("5. Salir")
         eleccion = input("Ingrese su elección: ")
 
         if eleccion == '1':
@@ -61,10 +103,14 @@ def principal():
         elif eleccion == '2':
             mostrar_base_de_datos()
         elif eleccion == '3':
+            cancion_mas_antigua()
+        elif eleccion == '4':
+            pais_con_mas_canciones()
+        elif eleccion == '5':
             print("Saliendo...")
             break
         else:
-            print("Elección inválida. Por favor, ingrese 1, 2 o 3.")
+            print("Elección inválida. Por favor, ingrese 1, 2, 3, 4 o 5.")
 
 
 if __name__ == '__main__':
