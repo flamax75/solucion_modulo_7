@@ -16,6 +16,3 @@ def principal():
         if eleccion == 1:
             obtener_y_almacenar_datos()
             print("Datos obtenidos y almacenados con exito!!!!")
-
-
-ooo
