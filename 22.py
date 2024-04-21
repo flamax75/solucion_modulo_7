@@ -18,7 +18,6 @@ def obtener_y_almacenar_datos():
             año TEXT,
             semanas_en_numero_uno INTEGER,
             pais TEXT,
-            idioma TEXT,
             UNIQUE(cancion, artista, año)
         )
     ''')
@@ -28,68 +27,23 @@ def obtener_y_almacenar_datos():
         if len(celdas) > 4:
             cancion = celdas[0].text.strip()
             artista = celdas[1].text.strip()
+            # Extrae el primer año en caso de un rango
             año = celdas[2].text.strip().split('/')[0]
             semanas = int(celdas[3].text.strip())
-            pais = celdas[4].text.strip().split('/')[0]
-            cursor.execute('INSERT OR IGNORE INTO canciones (cancion, artista, año, semanas_en_numero_uno, pais, idioma) VALUES (?, ?, ?, ?, ?, NULL)',
-                           (cancion, artista, int(año), semanas, pais))
+            pais = celdas[4].text.strip()
+            cursor.execute('INSERT OR IGNORE INTO canciones (cancion, artista, año, semanas_en_numero_uno, pais) VALUES (?, ?, ?, ?, ?)',
+                           (cancion, artista, int(año), semanas, pais))  # Convierte el año a entero
     conexion.commit()
     conexion.close()
-
-
-def obtener_idiomas_por_pais():
-    url = "https://restcountries.com/v3.1/all"
-    try:
-        response = requests.get(url)
-        response.raise_for_status()
-        datos = response.json()
-
-        pais_a_idioma = {}
-        for pais in datos:
-            nombre_pais = pais['name']['common']
-            idiomas = list(pais['languages'].values()
-                           ) if 'languages' in pais else ['No definido']
-            pais_a_idioma[nombre_pais] = ', '.join(idiomas)
-    except requests.RequestException as e:
-        print(f"Error al obtener datos de la API: {e}")
-        return {}
-
-    return pais_a_idioma
-
-
-def actualizar_idiomas_en_db():
-    pais_a_idioma = obtener_idiomas_por_pais()
-    if not pais_a_idioma:
-        print("No se pudo obtener el diccionario de idiomas.")
-        return
-
-    print("Datos obtenidos de la API:")
-    for pais, idioma in pais_a_idioma.items():
-        print(f"Pais: {pais}, Idioma: {idioma}")
-
-    conexion = sqlite3.connect('canciones.db')
-    cursor = conexion.cursor()
-
-    for pais, idioma in pais_a_idioma.items():
-        try:
-            cursor.execute(
-                'UPDATE canciones SET idioma = ? WHERE pais = ? AND (idioma IS NULL OR idioma = "Desconocido")', (idioma, pais))
-        except sqlite3.Error as e:
-            print(f"Error al actualizar idioma para {pais}: {e}")
-
-    conexion.commit()
-    conexion.close()
-    print("Idiomas actualizados con éxito en la base de datos.")
 
 
 def mostrar_base_de_datos():
     conexion = sqlite3.connect('canciones.db')
     cursor = conexion.cursor()
-    cursor.execute(
-        'SELECT cancion, artista, año, semanas_en_numero_uno, pais, idioma FROM canciones')
+    cursor.execute('SELECT * FROM canciones')
     filas = cursor.fetchall()
     for fila in filas:
-        print("Canción: {}, Artista: {}, Año: {}, Semanas N°1: {}, País: {}, Idioma: {}".format(*fila))
+        print(fila)
     conexion.close()
 
 
@@ -133,6 +87,45 @@ def pais_con_mas_canciones():
     conexion.close()
 
 
+def convertir_datos():
+    conexion = sqlite3.connect('canciones.db')
+    cursor = conexion.cursor()
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS canciones_convertidas (
+            cancion TEXT,
+            artista TEXT,
+            año TEXT,
+            semanas_en_numero_uno INTEGER,
+            pais TEXT,
+            UNIQUE(cancion, artista, año)
+        )
+    ''')
+
+    cursor.execute('SELECT * FROM canciones')
+    filas = cursor.fetchall()
+    for fila in filas:
+        cancion = fila[0]
+        artista = fila[1]
+        año = fila[2].split('/')[0]  # Tomar solo el primer año
+        semanas = fila[3]
+        pais = fila[4].split('/')[0]  # Tomar solo el primer país
+        cursor.execute('INSERT OR IGNORE INTO canciones_convertidas (cancion, artista, año, semanas_en_numero_uno, pais) VALUES (?, ?, ?, ?, ?)',
+                       (cancion, artista, año, semanas, pais))
+    conexion.commit()
+    conexion.close()
+    print("Datos convertidos y almacenados en una nueva tabla 'canciones_convertidas'.")
+
+
+def mostrar_base_de_datos_convertida():
+    conexion = sqlite3.connect('canciones.db')
+    cursor = conexion.cursor()
+    cursor.execute('SELECT * FROM canciones_convertidas')
+    filas = cursor.fetchall()
+    for fila in filas:
+        print(fila)
+    conexion.close()
+
+
 def principal():
     while True:
         print("\nMenú:")
@@ -140,8 +133,9 @@ def principal():
         print("2. Mostrar base de datos")
         print("3. Consultar la canción más antigua")
         print("4. Consultar el país con más canciones")
-        print("5. Actualizar idiomas desde API y mostrar datos obtenidos")
-        print("6. Salir")
+        print("5. Convertir datos (mostrar solo primer año y primer país)")
+        print("6. Mostrar base de datos convertida")
+        print("7. Salir")
         eleccion = input("Ingrese su elección: ")
 
         if eleccion == '1':
@@ -154,12 +148,14 @@ def principal():
         elif eleccion == '4':
             pais_con_mas_canciones()
         elif eleccion == '5':
-            actualizar_idiomas_en_db()
+            convertir_datos()
         elif eleccion == '6':
+            mostrar_base_de_datos_convertida()
+        elif eleccion == '7':
             print("Saliendo...")
             break
         else:
-            print("Elección inválida. Por favor, ingrese un número del 1 al 6.")
+            print("Elección inválida. Por favor, ingrese un número del 1 al 7.")
 
 
 if __name__ == '__main__':

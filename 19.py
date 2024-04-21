@@ -3,6 +3,21 @@ from bs4 import BeautifulSoup
 import sqlite3
 
 
+def obtener_idioma_continente_pais(pais):
+    url = f"https://restcountries.com/v3.1/name/{pais.split('/')[0]}"
+    response = requests.get(url)
+    data = response.json()
+    if response.status_code == 200 and len(data) > 0:
+        if 'languages' in data[0]:
+            idioma = data[0]['languages'][0]['name']
+        else:
+            idioma = 'Desconocido'
+        continente = data[0]['region']
+        return idioma, continente
+    else:
+        return None, None
+
+
 def obtener_y_almacenar_datos():
     url = 'https://es.wikipedia.org/wiki/Anexo:Sencillos_número_uno_en_España#Canciones_con_más_semanas_en_el_número_uno'
     respuesta = requests.get(url)
@@ -19,6 +34,7 @@ def obtener_y_almacenar_datos():
             semanas_en_numero_uno INTEGER,
             pais TEXT,
             idioma TEXT,
+            continente TEXT,
             UNIQUE(cancion, artista, año)
         )
     ''')
@@ -31,65 +47,35 @@ def obtener_y_almacenar_datos():
             año = celdas[2].text.strip().split('/')[0]
             semanas = int(celdas[3].text.strip())
             pais = celdas[4].text.strip().split('/')[0]
-            cursor.execute('INSERT OR IGNORE INTO canciones (cancion, artista, año, semanas_en_numero_uno, pais, idioma) VALUES (?, ?, ?, ?, ?, NULL)',
-                           (cancion, artista, int(año), semanas, pais))
+            idioma, continente = obtener_idioma_continente_pais(pais)
+            cursor.execute('INSERT OR IGNORE INTO canciones (cancion, artista, año, semanas_en_numero_uno, pais, idioma, continente) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                           (cancion, artista, int(año), semanas, pais, idioma, continente))
     conexion.commit()
     conexion.close()
 
 
-def obtener_idiomas_por_pais():
-    url = "https://restcountries.com/v3.1/all"
-    try:
-        response = requests.get(url)
-        response.raise_for_status()
-        datos = response.json()
-
-        pais_a_idioma = {}
-        for pais in datos:
-            nombre_pais = pais['name']['common']
-            idiomas = list(pais['languages'].values()
-                           ) if 'languages' in pais else ['No definido']
-            pais_a_idioma[nombre_pais] = ', '.join(idiomas)
-    except requests.RequestException as e:
-        print(f"Error al obtener datos de la API: {e}")
-        return {}
-
-    return pais_a_idioma
-
-
-def actualizar_idiomas_en_db():
-    pais_a_idioma = obtener_idiomas_por_pais()
-    if not pais_a_idioma:
-        print("No se pudo obtener el diccionario de idiomas.")
-        return
-
-    print("Datos obtenidos de la API:")
-    for pais, idioma in pais_a_idioma.items():
-        print(f"Pais: {pais}, Idioma: {idioma}")
+def agregar_idioma_continente():
+    pais = input("Ingrese el país para agregar idioma y continente: ")
+    idioma = input("Ingrese el idioma del país: ")
+    continente = input("Ingrese el continente del país: ")
 
     conexion = sqlite3.connect('canciones.db')
     cursor = conexion.cursor()
-
-    for pais, idioma in pais_a_idioma.items():
-        try:
-            cursor.execute(
-                'UPDATE canciones SET idioma = ? WHERE pais = ? AND (idioma IS NULL OR idioma = "Desconocido")', (idioma, pais))
-        except sqlite3.Error as e:
-            print(f"Error al actualizar idioma para {pais}: {e}")
-
+    cursor.execute(
+        'UPDATE canciones SET idioma = ?, continente = ? WHERE pais = ?', (idioma, continente, pais))
     conexion.commit()
     conexion.close()
-    print("Idiomas actualizados con éxito en la base de datos.")
+    print("Idioma y continente agregados correctamente.")
 
 
 def mostrar_base_de_datos():
     conexion = sqlite3.connect('canciones.db')
     cursor = conexion.cursor()
     cursor.execute(
-        'SELECT cancion, artista, año, semanas_en_numero_uno, pais, idioma FROM canciones')
+        'SELECT cancion, artista, año, semanas_en_numero_uno, pais, idioma, continente FROM canciones')
     filas = cursor.fetchall()
     for fila in filas:
-        print("Canción: {}, Artista: {}, Año: {}, Semanas N°1: {}, País: {}, Idioma: {}".format(*fila))
+        print("Canción: {}, Artista: {}, Año: {}, Semanas N°1: {}, País: {}, Idioma: {}, Continente: {}".format(*fila))
     conexion.close()
 
 
@@ -140,7 +126,7 @@ def principal():
         print("2. Mostrar base de datos")
         print("3. Consultar la canción más antigua")
         print("4. Consultar el país con más canciones")
-        print("5. Actualizar idiomas desde API y mostrar datos obtenidos")
+        print("5. Agregar idioma y continente para un país")
         print("6. Salir")
         eleccion = input("Ingrese su elección: ")
 
@@ -154,7 +140,7 @@ def principal():
         elif eleccion == '4':
             pais_con_mas_canciones()
         elif eleccion == '5':
-            actualizar_idiomas_en_db()
+            agregar_idioma_continente()
         elif eleccion == '6':
             print("Saliendo...")
             break
