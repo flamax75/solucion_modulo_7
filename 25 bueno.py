@@ -34,15 +34,16 @@ def extraer_resultados(url):
         resultados.append((cancion, artista, semanas, año, pais))
 
     cursor.execute('''CREATE TABLE IF NOT EXISTS canciones (
-                        cancion TEXT,
-                        artista TEXT,
-                        semanas INTEGER,
-                        año TEXT,
-                        pais TEXT
-                    )''')
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    cancion TEXT,
+                    artista TEXT,
+                    semanas INTEGER,
+                    año TEXT,
+                    pais TEXT
+                )''')
 
-    cursor.executemany(
-        "INSERT INTO canciones VALUES (?, ?, ?, ?, ?)", resultados)
+    ccursor.executemany(
+        "INSERT INTO canciones (cancion, artista, semanas, año, pais) VALUES (?, ?, ?, ?, ?)", resultados)
 
     conn.commit()
     conn.close()
